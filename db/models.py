@@ -13,7 +13,7 @@ class Questions(Base):
 
     id: Mapped[main_id]
     text: Mapped[str_200]
-    hash: Mapped[str]
+    hash: Mapped[str] = mapped_column(String, unique=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     complexity_id: Mapped[int] = mapped_column(ForeignKey("complexity.id"))
 
@@ -27,7 +27,7 @@ class Options(Base):
     id: Mapped[main_id]
     question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"))
     text: Mapped[str_200]
-    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=True, server_default=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=True, server_default="False")
 
     question: Mapped["Questions"] = relationship()
 
@@ -35,7 +35,7 @@ class Categories(Base):
     __tablename__ = "categories"
 
     id: Mapped[main_id]
-    name: Mapped[str_200]
+    name: Mapped[str_200] = mapped_column(unique=True)
 
     questions: Mapped[list["Questions"]] = relationship()
 
@@ -43,7 +43,7 @@ class Complexity(Base):
     __tablename__ = "complexity"
 
     id: Mapped[main_id]
-    level: Mapped[str] = mapped_column(ENUM('easy', 'medium', 'hard', 'very hard'))
+    level: Mapped[str] = mapped_column(ENUM('easy', 'medium', 'hard', 'very hard', name='complexity_level_enum'), unique=True)
 
     questions: Mapped[list["Questions"]] = relationship()
 
