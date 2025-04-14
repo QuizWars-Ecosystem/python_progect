@@ -13,6 +13,7 @@ class Questions(Base):
 
     id: Mapped[main_id]
     text: Mapped[str_200]
+    hash: Mapped[str]
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     complexity_id: Mapped[int] = mapped_column(ForeignKey("complexity.id"))
 

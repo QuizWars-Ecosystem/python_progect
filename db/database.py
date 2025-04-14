@@ -4,7 +4,7 @@ from config import settings
 
 
 async_engine = create_async_engine(
-    url=settings.db.url,
+    url=settings.db.DB_URL,
     echo=settings.db.echo,
     pool_size=settings.db.pool_size,
     max_overflow=settings.db.max_overflow)
