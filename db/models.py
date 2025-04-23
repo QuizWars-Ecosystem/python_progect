@@ -12,7 +12,7 @@ class Hashs(Base):
     __tablename__ = "hashs"
 
     id: Mapped[main_id]
-    hash: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
 
     question: Mapped["Questions"] = relationship()
 
@@ -21,7 +21,7 @@ class Questions(Base):
 
     id: Mapped[main_id]
     text: Mapped[str_500]
-    verified: Mapped[bool] = mapped_column(Boolean, server_default='False', nullable=False)
+    verified: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     complexity: Mapped[str] = mapped_column(ENUM('easy', 'medium', 'hard', 'very hard', name='complexity_level_enum'))
     lang: Mapped[str] = mapped_column(String(3))
 
@@ -36,7 +36,7 @@ class Options(Base):
     id: Mapped[main_id]
     question_id: Mapped[int] = mapped_column(ForeignKey("questions.id"))
     text: Mapped[str] = mapped_column(String(256), nullable=False)
-    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=True, server_default="False")
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=True, server_default="false")
 
     question: Mapped["Questions"] = relationship()
 
@@ -44,7 +44,7 @@ class Categories(Base):
     __tablename__ = "categories"
 
     id: Mapped[main_id]
-    name: Mapped[str] = mapped_column(String(32), server_default="Null", unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(64), server_default=None, unique=True, nullable=False)
 
     questions: Mapped[list["Questions"]] = relationship()
 
