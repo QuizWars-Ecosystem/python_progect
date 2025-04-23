@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 from sqlalchemy import text
+from bs4 import BeautifulSoup
 
 from db.models import Questions, Options, Categories
 from db.database import async_engine, async_session_factory, Base
@@ -19,7 +20,9 @@ async def add_db(que_text: str,
                  verified: bool = False,
                  lang: str = "en") -> bool:
     try:
-        hash_text = hashlib.sha256(que_text.strip().lower().encode()).hexdigest()
+        soup = BeautifulSoup(que_text, "html.parser")
+        clean_text = soup.get_text().replace("\"", "\'")
+        hash_text = hashlib.sha256(clean_text.strip().lower().encode()).hexdigest()
         async with async_engine.begin() as conn:
             res = await conn.execute(text("SELECT hash FROM hashs WHERE hash = :hash"), {"hash": hash_text})
             if res.fetchone():  # если хеш уже есть в бд
@@ -40,21 +43,23 @@ async def add_db(que_text: str,
 
             # Вопрос
             question_id = await conn.execute(text("""
-                INSERT INTO questions (text, verified, complexity, lang, hash_id, category_id)
-                VALUES (:text, :verified, :complexity, :lang, :hash_id, :category_id)
-                RETURNING id"""), {"text": que_text, "verified": verified,
-                                   "complexity": complexity, "lang": lang,
-                                   "hash_id": hash_id, "category_id": category_id})
+                INSERT INTO questions (text, verified, complexity, lang, category_id)
+                VALUES (:text, :verified, :complexity, :lang, :category_id)
+                RETURNING id"""), {"text": clean_text, "verified": verified, "complexity": complexity, "lang": lang,"category_id": category_id})
             question_id = question_id.scalar()
 
             # Правильный ответ
+            soup2 = BeautifulSoup(correct_answer, "html.parser")
+            clean_cor_answ = soup2.get_text()
             await conn.execute(text("""INSERT INTO options (question_id, text, is_correct)
-            VALUES (:question_id, :text, TRUE)"""), {"question_id":question_id, "text": correct_answer})
+            VALUES (:question_id, :text, TRUE)"""), {"question_id":question_id, "text": clean_cor_answ})
 
             # Неправильные ответы
             for answer in incorrect_answers:
+                soup3 = BeautifulSoup(answer, "html.parser")
+                clean_answer = soup3.get_text()
                 await conn.execute(text("""INSERT INTO options (question_id, text, is_correct)
-                VALUES (:question_id, :text, FALSE)"""), {"question_id": question_id, "text": answer})
+                VALUES (:question_id, :text, FALSE)"""), {"question_id": question_id, "text": clean_answer})
 
     except Exception as e:
         print(f"Error: {e}")
@@ -65,43 +70,30 @@ async def add_db(que_text: str,
 async def remove_db(que_text: str) -> bool:
     try:
         async with async_engine.begin() as conn:
-            hash_text = hashlib.sha256(que_text.strip().lower().encode()).hexdigest()
-            res = await conn.execute(text("""SELECT hash FROM hashs WHERE hash = :hash"""), {"hash": hash_text})
-            if not res.scalar():
+            soup = BeautifulSoup(que_text, "html.parser")
+            clean_text = soup.get_text()
+            res = await conn.execute(text("""SELECT id FROM questions
+            WHERE text = :text"""), {"text": clean_text})
+
+            question_row = res.fetchone()
+            print(f"{question_row=}")
+            if not question_row:
+                print(f"Вопрос не найден: {que_text}")
                 return False
 
-            question_id = await conn.execute(text("""
-            SELECT q.id FROM questions AS q
-            JOIN hashs AS h
-            ON q.hash_id = h.id
-            WHERE h.hash = :hash"""), {"hash": hash_text})
-            question_id = question_id.scalar()
-            if question_id: # Если есть вопрос, удаляем ответы
-                await conn.execute(text("""DELETE FROM options 
-                WHERE question_id = :question_id"""), {"question_id": question_id})
+            question_id = question_row[0]
 
-                # Сам вопрос
-                await conn.execute(text("""DELETE FROM questions WHERE id = :question_id"""), {"question_id": question_id})
-                print(f"Удалили вопрос {question_id} и его ответы")
-            else:
-                print("У этого хэша нет связанного вопроса и ответов")
+            # Удаляем ответы
+            await conn.execute(text("""DELETE FROM options 
+            WHERE question_id = :question_id"""), {"question_id": question_id})
+
+            # Сам вопрос
+            await conn.execute(text("""DELETE FROM questions WHERE id = :question_id"""), {"question_id": question_id})
+            print(f"Удалили вопрос: {que_text} с его id: {question_id} и его ответы")
 
             return True
 
     except Exception as e:
         print(f"Error: {e}")
+        return False
 
-# async def main():
-#     await create_tables()
-#     await add_db(
-#         que_text="Какой язык программирования самый популярный?",
-#         complexity="easy",
-#         category="Программирование",
-#         correct_answer="Python",
-#         incorrect_answers=["Java", "C++", "PHP"],
-#         verified=True,
-#         lang="ru")
-#     await asyncio.sleep(10)
-#     await remove_db("Какой язык программирования самый популярный?")
-#
-# asyncio.run(main())

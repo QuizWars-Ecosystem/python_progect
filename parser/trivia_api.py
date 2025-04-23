@@ -24,7 +24,7 @@ async def get_request(count: int = 50) -> list[dict]:
             async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(API_URL, params=params) as responce:
                     if responce.status == 429:
-                        print(f"Сшилком много запросов (429)! Жду..........")
+                        print(f"Слишком много запросов (429)! Жду..........")
                         await asyncio.sleep(random.uniform(10.0, 16.0))
 
                     if responce.status != 200 and responce.status != 429:

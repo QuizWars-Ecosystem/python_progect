@@ -14,7 +14,7 @@ class Hashs(Base):
     id: Mapped[main_id]
     hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
 
-    question: Mapped[list["Questions"]] = relationship()
+    question: Mapped["Questions"] = relationship()
 
 class Questions(Base):
     __tablename__ = "questions"
@@ -25,7 +25,6 @@ class Questions(Base):
     complexity: Mapped[str] = mapped_column(ENUM('easy', 'medium', 'hard', 'very hard', name='complexity_level_enum'))
     lang: Mapped[str] = mapped_column(String(3))
 
-    hash_id: Mapped[int] = mapped_column(ForeignKey("hashs.id"))
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
 
     category: Mapped["Categories"] = relationship()
