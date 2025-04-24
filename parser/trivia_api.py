@@ -3,7 +3,7 @@ import aiohttp
 import random
 from aiohttp import ClientError
 
-from db.fn import create_tables, add_db, remove_db
+from db.fn import create_tables, add_question_to_db, remove_question_to_db
 
 API_URL = "https://opentdb.com/api.php"
 
@@ -43,21 +43,20 @@ async def get_request(count: int = 50) -> list[dict]:
         print(f"Ошибка сети: {str(e)}. Жду 4 сек.....")
         await asyncio.sleep(4)
 
-async def main():
-    await create_tables()
-    while True:
-        questions_list = await get_request()
-        for question in questions_list:
-            await add_db(
-                que_text=question['question'],                      # Текст вопроса
-                complexity=question.get('difficulty', 'easy'),      # Сложность (с fallback)
-                category=question['category'],                      # Категория
-                correct_answer=question['correct_answer'],          # Правильный ответ
-                incorrect_answers=question['incorrect_answers'],    # Неправильные ответы
-                verified=False,                                      # Пример дополнительного параметра
-                lang="en")                                          # Язык
-        print("Sleep................")
-        await asyncio.sleep(random.uniform(4.0, 7.5))
+async def trivia_main():
+    try:
+        while True:
+            questions_list = await get_request()
+            for question in questions_list:
+                await add_question_to_db(
+                    que_text=question['question'],
+                    complexity=question.get('difficulty', 'easy'),
+                    category=question['category'],
+                    correct_answer=question['correct_answer'],
+                    incorrect_answers=question['incorrect_answers'],
+                    verified=False,
+                    lang="en")
+            await asyncio.sleep(random.uniform(4.0, 7.5))
+    except Exception as e:
+        print(f"Error: {e}")
 
-if __name__ == "__main__":
-    asyncio.run(main())
