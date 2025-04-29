@@ -12,7 +12,8 @@ async def create_tables():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
-async def add_db(que_text: str,
+
+async def add_question_to_db(que_text: str,
                  complexity: str,
                  category: str,
                  correct_answer: str,
@@ -67,7 +68,7 @@ async def add_db(que_text: str,
     return True
 
 
-async def remove_db(que_text: str) -> bool:
+async def remove_question_to_db(que_text: str) -> bool:
     try:
         async with async_engine.begin() as conn:
             soup = BeautifulSoup(que_text, "html.parser")
@@ -96,4 +97,76 @@ async def remove_db(que_text: str) -> bool:
     except Exception as e:
         print(f"Error: {e}")
         return False
+
+
+async def get_questions_pagination(count: int = 100, verified: bool = None,
+                                   complexity: str = None, lang: str = "en",
+                                   category: str = None) -> list[dict]:
+    try:
+        async with async_engine.connect() as conn:
+            query = ("""
+                SELECT
+                    q.id,
+                    q.text,
+                    q.verified,
+                    q.complexity,
+                    q.lang,
+                    c.name as category_name
+                FROM questions AS q
+                LEFT JOIN categories AS c ON q.category_id = c.id
+                WHERE 1=1""")
+            params = {}
+
+            if verified is not None:
+                query += " AND q.verified = :verified"
+                params["verified"] = verified
+            if complexity:
+                query += " AND q.complexity = :complexity"
+                params["complexity"] = complexity
+            if lang:
+                query += " AND q.lang = :lang"
+                params["lang"] = lang
+            if category:
+                query += " AND c.name = :category"
+                params["category"] = category.strip().capitalize()
+
+            query += " ORDER BY q.id LIMIT :count"
+            params["count"] = count
+
+            res = await conn.execute(text(query), params)
+            questions = res.fetchall()
+            if not questions:
+                return []
+
+            question_ids_list = [q[0] for q in questions]
+            print(f"{question_ids_list=}")
+            options_query = """
+                SELECT id, question_id, text, is_correct
+                FROM options WHERE question_id = ANY(:question_ids_list)
+                ORDER BY question_id, id"""
+            options_res = await conn.execute(text(options_query), {"question_ids_list": question_ids_list})
+            options = options_res.fetchall()
+
+            questions_res = []
+            for q in questions:
+                question_data = {
+                    "id": q[0],
+                    "text": q[1],
+                    "verified": q[2],
+                    "complexity": q[3],
+                    "lang": q[4],
+                    "category": q[5],
+                    "options":
+                        [{
+                            "id": opt[0],
+                            "question_id": opt[1],
+                            "text": opt[2],
+                            "is_correct": opt[3]
+                        }for opt in options if opt[1] == q[0]]
+                }
+                questions_res.append(question_data)
+            return questions_res
+
+    except Exception as e:
+        print(f"Error: {e}")
 
