@@ -1,4 +1,5 @@
 venv
+config.yaml
 .env
 .idea/
 __pycache__
