@@ -2,8 +2,10 @@ import uvicorn
 from fastapi import FastAPI
 
 from api.config import settings
+from api.handlers import router as jobs_rout
 
 app = FastAPI(root_path=settings.api.root_path)
+app.include_router(jobs_rout)
 
 
 
