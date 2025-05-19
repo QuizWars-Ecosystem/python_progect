@@ -1,3 +1,4 @@
+import datetime
 from sqlalchemy import INTEGER, String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ENUM
@@ -47,4 +48,19 @@ class Categories(Base):
     name: Mapped[str] = mapped_column(String(64), server_default=None, unique=True, nullable=False)
 
     questions: Mapped[list["Questions"]] = relationship()
+
+
+# Scheduler / Timer
+class Scheduler(Base):
+    __tablename__ = "scheduler"
+
+    id: Mapped[main_id]
+    name: Mapped[str] #"web-site",
+    url: Mapped[str] #"website.com"
+    state: Mapped[str] = mapped_column(ENUM("WORKING", "PAUSED", "STOPED", name='state_scheduler_enum'))
+    mode: Mapped[str] = mapped_column(ENUM("CRON", "TIMER", name='mode_scheduler_enum'))
+    schedule: Mapped[str]
+    interval: Mapped[int]
+    nextRunAt: Mapped[datetime]
+    lastRunAt: Mapped[datetime]
 
