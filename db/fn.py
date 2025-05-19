@@ -1,9 +1,10 @@
 import asyncio
+import datetime
 import hashlib
 from sqlalchemy import text
 from bs4 import BeautifulSoup
 
-from db.models import Questions, Options, Categories
+from db.models import Questions, Options, Categories, Scheduler
 from db.database import async_engine, async_session_factory, Base
 
 
@@ -139,7 +140,6 @@ async def get_questions_pagination(count: int = 100, verified: bool = None,
                 return []
 
             question_ids_list = [q[0] for q in questions]
-            print(f"{question_ids_list=}")
             options_query = """
                 SELECT id, question_id, text, is_correct
                 FROM options WHERE question_id = ANY(:question_ids_list)
@@ -169,4 +169,57 @@ async def get_questions_pagination(count: int = 100, verified: bool = None,
 
     except Exception as e:
         print(f"Error: {e}")
+
+
+
+
+# Scheduler
+async def get_all_jobs():
+    """БД запрос на получение всех задач сервера."""
+    async with async_engine.connect() as conn:
+        query = ("""
+            SELECT
+                s.id,
+                s.name,
+                s.url,
+                s.state,
+                s.mode,
+                s.schedule,
+                s.interval,
+                s.nextRunAt,
+                s.lastRunAt
+            FROM scheduler AS s""")
+        res = await conn.execute(text(query))
+        jobs = res.fetchall()
+        if not jobs:
+            return False
+
+        jobs_res = []
+        for j in jobs:
+            jobs_data = {
+            "id": j[0],
+            "name": j[1],
+            "url": j[2],
+            "state": j[3],
+            "mode": j[4],
+            "schedule": j[5],
+            "interval": j[6],
+            "nextRunAt": j[7],
+            "lastRunAt": j[8]}
+            jobs_res.append(jobs_data)
+        return jobs_res
+
+
+async def change_mode_by_id(id: int, mode: str, schedule: str, interval: int):
+    """БД запрос на изменение режима существующей задачи и присвоение ей новой конфигурации."""
+    pass
+
+
+async def change_parameters_by_id(id: int, schedule: str | None, interval: int | None):
+    """БД изменение параметров существующей задачи (CRON/TIMER)"""
+    pass
+
+async def change_state_job_by_id(id: int, action: str, startAt: datetime):
+    """БД управление состоянием задачи (старт/пауза/остановка)"""
+    pass
 
