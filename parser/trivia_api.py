@@ -3,9 +3,10 @@ import aiohttp
 import random
 from aiohttp import ClientError
 
-from db.fn import create_tables, add_question_to_db, remove_question_to_db
+from db.fn import create_tables, add_question_to_db
+from api.config import settings
 
-API_URL = "https://opentdb.com/api.php"
+API_URL = settings.get_job("trivia-api").url
 
 async def get_request(count: int = 50) -> list[dict]:
     try:
@@ -45,6 +46,7 @@ async def get_request(count: int = 50) -> list[dict]:
 
 async def trivia_main():
     try:
+        # await create_tables()
         while True:
             questions_list = await get_request()
             for question in questions_list:
