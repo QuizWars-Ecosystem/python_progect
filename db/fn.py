@@ -1,8 +1,8 @@
-import asyncio
-import datetime
 import hashlib
+from datetime import datetime
 from sqlalchemy import text
 from bs4 import BeautifulSoup
+from typing import Optional
 
 from db.models import Questions, Options, Categories, Scheduler
 from db.database import async_engine, async_session_factory, Base
@@ -186,40 +186,124 @@ async def get_all_jobs():
                 s.mode,
                 s.schedule,
                 s.interval,
-                s.nextRunAt,
-                s.lastRunAt
+                s.next_run,
+                s.last_run
             FROM scheduler AS s""")
         res = await conn.execute(text(query))
-        jobs = res.fetchall()
+        jobs = res.mappings().all()  # Получаем результаты как словари
         if not jobs:
             return False
 
-        jobs_res = []
-        for j in jobs:
-            jobs_data = {
-            "id": j[0],
-            "name": j[1],
-            "url": j[2],
-            "state": j[3],
-            "mode": j[4],
-            "schedule": j[5],
-            "interval": j[6],
-            "nextRunAt": j[7],
-            "lastRunAt": j[8]}
-            jobs_res.append(jobs_data)
-        return jobs_res
+        return [dict(job) for job in jobs]
 
 
-async def change_mode_by_id(id: int, mode: str, schedule: str, interval: int):
+async def change_mode_by_id(id: int, mode: str,
+                            schedule: Optional[str] = None,
+                            interval: Optional[int] = None) -> bool:
     """БД запрос на изменение режима существующей задачи и присвоение ей новой конфигурации."""
-    pass
+    async with async_engine.begin() as conn:
+        try:
+            update_data = {
+                "mode": mode,
+                "state": "WORKING"}
+            if mode == "CRON":
+                update_data["schedule"] = schedule
+                update_data["interval"] = None
+            else:
+                update_data["schedule"] = None
+                update_data["interval"] = interval
+
+            await conn.execute(text("""
+                UPDATE scheduler
+                SET mode = :mode,
+                    schedule = :schedule,
+                    interval = :interval,
+                    state = :state
+                WHERE id = :id"""), {"id": id, **update_data})
+            return True
+        except Exception as e:
+            print(f"Error changing job mode: {e}")
+            return False
 
 
-async def change_parameters_by_id(id: int, schedule: str | None, interval: int | None):
+
+async def change_parameters_by_id(id: int,
+                                  schedule: Optional[str] = None,
+                                  interval: Optional[int] = None) -> bool:
     """БД изменение параметров существующей задачи (CRON/TIMER)"""
-    pass
+    async with async_engine.begin() as conn:
+        try:
+            res = await conn.execute(text("SELECT mode FROM scheduler WHERE id = :id"), {"id": id})
+            current_mode = res.scalar_one()
 
-async def change_state_job_by_id(id: int, action: str, startAt: datetime):
+            if current_mode == "CRON" and schedule:
+                await conn.execute(
+                    text("""
+                        UPDATE scheduler 
+                            SET schedule = :schedule 
+                        WHERE id = :id"""),
+                    {"id": id, "schedule": schedule})
+            elif current_mode == "TIMER" and interval:
+                await conn.execute(
+                    text("""
+                        UPDATE scheduler 
+                            SET interval = :interval 
+                        WHERE id = :id"""),
+                    {"id": id, "interval": interval})
+            else:
+                raise ValueError("Invalid parameters for current job mode")
+
+            return True
+        except Exception as e:
+            print(f"Error changing job mode: {e}")
+            return False
+
+async def change_state_job_by_id(id: int, action: str,
+                                 start_at: Optional[datetime] = None):
     """БД управление состоянием задачи (старт/пауза/остановка)"""
-    pass
+    async with async_engine.begin() as conn:
+        try:
+            update_data = {"state": action.upper()}
+
+            if action.upper() == "PAUSED" and start_at:
+                update_data["nextRunAt"] = start_at
+
+            await conn.execute(
+                text("""
+                            UPDATE scheduler 
+                            SET state = :state, 
+                                nextRunAt = :nextRunAt
+                            WHERE id = :id
+                        """),
+                {"id": id, **update_data}
+            )
+            return True
+        except Exception as e:
+            print(f"Error changing job state: {e}")
+            return False
+
+
+async def update_job_timestamps(id: int,
+                                last_run: datetime,
+                                next_run: Optional[datetime] = None) -> bool:
+    """Обновление временных меток задачи"""
+    async with async_engine.begin() as conn:
+        try:
+            update_data = {"lastRunAt": last_run}
+            if next_run:
+                update_data["nextRunAt"] = next_run
+
+            await conn.execute(
+                text("""
+                    UPDATE scheduler 
+                    SET lastRunAt = :lastRunAt, 
+                        nextRunAt = :nextRunAt
+                    WHERE id = :id
+                """),
+                {"id": id, **update_data}
+            )
+            return True
+        except Exception as e:
+            print(f"Error updating job timestamps: {e}")
+            return False
 
