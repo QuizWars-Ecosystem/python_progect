@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from sqlalchemy import INTEGER, String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ENUM
@@ -61,6 +61,6 @@ class Scheduler(Base):
     mode: Mapped[str] = mapped_column(ENUM("CRON", "TIMER", name='mode_scheduler_enum'))
     schedule: Mapped[str]
     interval: Mapped[int]
-    nextRunAt: Mapped[datetime]
-    lastRunAt: Mapped[datetime]
+    next_run: Mapped[datetime]
+    last_run: Mapped[datetime]
 

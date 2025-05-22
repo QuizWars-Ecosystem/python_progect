@@ -44,9 +44,8 @@ async def get_request(count: int = 50) -> list[dict]:
         print(f"Ошибка сети: {str(e)}. Жду 4 сек.....")
         await asyncio.sleep(4)
 
-async def trivia_main():
+async def trivia_main(timer: float):
     try:
-        # await create_tables()
         while True:
             questions_list = await get_request()
             for question in questions_list:
@@ -58,7 +57,7 @@ async def trivia_main():
                     incorrect_answers=question['incorrect_answers'],
                     verified=False,
                     lang="en")
-            await asyncio.sleep(random.uniform(4.0, 7.5))
+            await asyncio.sleep(timer)
     except Exception as e:
         print(f"Error: {e}")
 
