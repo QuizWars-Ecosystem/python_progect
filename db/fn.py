@@ -174,10 +174,14 @@ async def get_questions_pagination(count: int = 100, verified: bool = None,
 
 
 # Scheduler
-async def create_scheduler_job(id: int, name: str, url: str,
-                               state:str, mode: str, schedule: str,
-                               interval: int, next_run: datetime, last_run: datetime) -> bool:
+async def create_new_scheduler_job(name: str, url: str,
+                                   schedule: str | None, interval: int | None,
+                                   next_run: datetime | None,
+                                   last_run: datetime | None,
+                                   state: str = "WORKING", mode: str = "CRON") -> bool:
     async with async_engine.connect() as conn:
+        if not schedule and not interval:
+            raise ValueError("Need to pass a schedule or interval")
         try:
             query = ("""INSERT INTO scheduler VALUES (
                     :name,
@@ -216,7 +220,7 @@ async def get_all_jobs() -> List[Dict[str, Any]]:
             res = await conn.execute(text(query))
             jobs = res.mappings().all()  # Получаем результаты как словари
             if not jobs:
-                return False
+                return []
             return [dict(job) for job in jobs]
         except Exception as e:
             print(f"Database fetch error: {e}")
