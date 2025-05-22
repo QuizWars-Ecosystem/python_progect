@@ -33,6 +33,6 @@ class JobScheduler:
                 db_jobs.append(job)
 
         for task in db_jobs:
-            
+
                 
 
