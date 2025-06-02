@@ -3,14 +3,15 @@ import aiohttp
 import random
 from aiohttp import ClientError
 
-from db.fn import create_tables, add_question_to_db
+from db.fn import add_question_to_db
 from api.config import settings
 
 API_URL = settings.get_job("trivia-api").url
 
-async def get_request(count: int = 50) -> list[dict]:
+async def get_request(count: int = 50, max_retries: int = 10) -> list[dict]:
     try:
-        while True:
+        retries = 0
+        while retries < max_retries:
             USER_AGENTS = [
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
                 "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
@@ -41,23 +42,25 @@ async def get_request(count: int = 50) -> list[dict]:
 
                     return questions['results']
     except ClientError as e:
+        retries += 1
         print(f"Ошибка сети: {str(e)}. Жду 4 сек.....")
         await asyncio.sleep(4)
 
-async def trivia_main(timer: float):
+
+async def trivia_main():
     try:
-        while True:
-            questions_list = await get_request()
-            for question in questions_list:
-                await add_question_to_db(
-                    que_text=question['question'],
-                    complexity=question.get('difficulty', 'easy'),
-                    category=question['category'],
-                    correct_answer=question['correct_answer'],
-                    incorrect_answers=question['incorrect_answers'],
-                    verified=False,
-                    lang="en")
-            await asyncio.sleep(timer)
+        questions_list = await get_request()
+        for question in questions_list:
+            await add_question_to_db(
+                que_text=question['question'],
+                complexity=question.get('difficulty', 'easy'),
+                category=question['category'],
+                correct_answer=question['correct_answer'],
+                incorrect_answers=question['incorrect_answers'],
+                verified=False,
+                lang="en")
+        return True
     except Exception as e:
         print(f"Error: {e}")
+        return False
 
