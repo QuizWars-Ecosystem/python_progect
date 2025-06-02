@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from pathlib import Path
 from typing import Optional, Literal, List, Dict
+from datetime import datetime
 
 yaml_path = Path(__file__).parent.parent / "config.yaml"
 
@@ -17,6 +18,8 @@ class JobConfig(BaseModel):
     schedule: Optional[str] = Field(default=None)
     interval: Optional[int] = Field(default=None)
     state: Literal["WORKING", "PAUSED", "STOPPED"] = Field(default="WORKING")
+    next_run: Optional[datetime] = Field(default=None)
+    last_run: Optional[datetime] = Field(default=None)
 
 class SendConfig(BaseModel):
     batch_size: int = Field(default=5, ge=1)
