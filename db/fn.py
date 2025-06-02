@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import text
 from bs4 import BeautifulSoup
 from typing import Optional, List, Dict, Any
-
+import asyncio
 from db.models import Questions, Options, Categories, Scheduler
 from db.database import async_engine, async_session_factory, Base
 
@@ -174,37 +174,46 @@ async def get_questions_pagination(count: int = 100, verified: bool = None,
 
 
 # Scheduler
-async def create_new_scheduler_job(name: str, url: str,
-                                   schedule: str | None, interval: int | None,
-                                   next_run: datetime | None,
-                                   last_run: datetime | None,
-                                   state: str = "WORKING", mode: str = "CRON") -> bool:
-    async with async_engine.connect() as conn:
-        if not schedule and not interval:
-            raise ValueError("Need to pass a schedule or interval")
-        try:
-            query = ("""INSERT INTO scheduler VALUES (
-                    :name,
+async def db_create_new_job(name: str, url: str,
+                            schedule: str | None, interval: int | None,
+                            next_run: datetime | None, last_run: datetime | None,
+                            state: str = "WORKING", mode: str = "TIMER") -> int | bool:
+    try:
+        async with async_engine.connect() as conn:
+            if not schedule and not interval:
+                raise ValueError("Need to pass a schedule or interval")
+            query = ("""INSERT INTO scheduler (
+                    name,
+                    url,
+                    state,
+                    mode,
+                    schedule,
+                    interval,
+                    next_run, 
+                    last_run) 
+                    VALUES (:name,
                     :url,
                     :state,
                     :mode,
                     :schedule,
                     :interval,
-                    :next_run,
-                    :last_run)""")
-            await conn.execute(query, {"name": name, "url": url, "state": state, "mode": mode,
+                    :next_run, 
+                    :last_run)
+                    RETURNING id""")
+            res = await conn.execute(text(query), {"name": name, "url": url, "state": state, "mode": mode,
             "schedule": schedule, "interval": interval, "next_run": next_run, "last_run": last_run})
             await conn.commit()
-            return True
-        except Exception as e:
-            print(f"Error adding task to database: {e}")
-            return False
+            job_id = res.scalar()
+            return job_id
+    except Exception as e:
+        print(f"Error adding task to database: {e}")
+        return False
 
 
-async def get_all_jobs() -> List[Dict[str, Any]]:
+async def db_get_all_jobs() -> List[Dict[str, Any]]:
     """БД запрос на получение всех задач сервера."""
-    async with async_engine.connect() as conn:
-        try:
+    try:
+        async with async_engine.connect() as conn:
             query = ("""
                 SELECT
                     s.id,
@@ -214,20 +223,20 @@ async def get_all_jobs() -> List[Dict[str, Any]]:
                     s.mode,
                     s.schedule,
                     s.interval,
-                    s.next_run,
+                    s.next_run, 
                     s.last_run
                 FROM scheduler AS s""")
             res = await conn.execute(text(query))
-            jobs = res.mappings().all()  # Получаем результаты как словари
+            jobs = res.mappings().all()
             if not jobs:
                 return []
             return [dict(job) for job in jobs]
-        except Exception as e:
-            print(f"Database fetch error: {e}")
-            return False
+    except Exception as e:
+        raise Exception(f"Error for db_get_all_jobs: {e}")
+        return False
 
 
-async def change_mode_by_id(id: int, mode: str,
+async def db_change_mode(id: int, mode: str,
                             schedule: Optional[str] = None,
                             interval: Optional[int] = None) -> bool:
     """БД запрос на изменение режима существующей задачи и присвоение ей новой конфигурации."""
@@ -239,7 +248,7 @@ async def change_mode_by_id(id: int, mode: str,
             if mode == "CRON":
                 update_data["schedule"] = schedule
                 update_data["interval"] = None
-            else:
+            elif mode == "TIMER":
                 update_data["schedule"] = None
                 update_data["interval"] = interval
 
@@ -257,7 +266,8 @@ async def change_mode_by_id(id: int, mode: str,
             return False
 
 
-async def change_parameters_by_id(id: int,
+# эту в handlers
+async def db_change_parameters(id: int,
                                   schedule: Optional[str] = None,
                                   interval: Optional[int] = None) -> bool:
     """БД изменение параметров существующей задачи (CRON/TIMER)"""
@@ -289,7 +299,7 @@ async def change_parameters_by_id(id: int,
             return False
 
 
-async def change_state_job_by_id(id: int, action: str,
+async def db_change_state_job(id: int, action: str,
                                  start_at: Optional[datetime] = None) -> bool:
     """БД управление состоянием задачи (старт/пауза/остановка)"""
     async with async_engine.connect() as conn:
@@ -298,6 +308,8 @@ async def change_state_job_by_id(id: int, action: str,
 
             if action.upper() == "PAUSED" and start_at:
                 update_data["next_run"] = start_at
+            else:
+                update_data["next_run"] = None
 
             await conn.execute(
                 text("""UPDATE scheduler 
@@ -309,28 +321,5 @@ async def change_state_job_by_id(id: int, action: str,
             return True
         except Exception as e:
             print(f"Error changing job state: {e}")
-            return False
-
-
-async def update_job_timestamps(id: int,
-                                last_run: datetime,
-                                next_run: Optional[datetime] = None) -> bool:
-    """Обновление временных меток задачи"""
-    async with async_engine.connect() as conn:
-        try:
-            update_data = {"last_run": last_run}
-            if next_run:
-                update_data["next_run"] = next_run
-
-            await conn.execute(
-                text("""UPDATE scheduler 
-                        SET last_run = :last_run, 
-                            next_run = :next_run
-                        WHERE id = :id"""),
-                        {"id": id, **update_data})
-            await conn.commit()
-            return True
-        except Exception as e:
-            print(f"Error updating job timestamps: {e}")
             return False
 

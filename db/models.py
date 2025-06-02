@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import INTEGER, String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ENUM
-from typing import Annotated
+from typing import Annotated, Optional
 
 from db.database import Base
 
@@ -57,10 +57,10 @@ class Scheduler(Base):
     id: Mapped[main_id]
     name: Mapped[str] #"web-site",
     url: Mapped[str] #"website.com"
-    state: Mapped[str] = mapped_column(ENUM("WORKING", "PAUSED", "STOPED", name='state_scheduler_enum'))
-    mode: Mapped[str] = mapped_column(ENUM("CRON", "TIMER", name='mode_scheduler_enum'))
-    schedule: Mapped[str]
-    interval: Mapped[int]
-    next_run: Mapped[datetime]
-    last_run: Mapped[datetime]
+    state: Mapped[str] = mapped_column(ENUM("WORKING", "PAUSED", "STOPED", name='state_scheduler_enum'), nullable=False, server_default="WORKING")
+    mode: Mapped[str] = mapped_column(ENUM("CRON", "TIMER", name='mode_scheduler_enum'), nullable=False, server_default="TIMER")
+    schedule: Mapped[Optional[str]]
+    interval: Mapped[Optional[int]]
+    next_run: Mapped[Optional[datetime]]
+    last_run: Mapped[Optional[datetime]]
 
